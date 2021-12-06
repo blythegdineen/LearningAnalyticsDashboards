@@ -1,0 +1,538 @@
+---
+title: "Dashboards for Clicker Data"
+author: '[Blythe Dineen, bmd223]'
+subtitle: INFO 4100 Learning Analytics
+output:
+  word_document: default
+---
+
+This project is about developing a learning analytics dashboard based on clicker data. You will work as a team to learn how to make a dashboard using R Shiny (official page with several tutorials: https://shiny.rstudio.com/tutorial/). 
+
+**Learning Objectives**
+
+1. Understand the structure of clicker data
+2. Create multiple different visualizations
+3. Design and implement an instructor and student dashboard
+4. Critically evaluate your own dashboard design
+
+You are given aggregated clicker records for a CS course taught at Cornell. There are two datasets: the experience dataset and the quiz dataset.
+
+**Scenario** 
+
+You are approached by a college instructor who uses iClickers in her CS class on Business Intelligence. She would like to gain insights about her students and how they are engaging/performing in order to better help them in class. She would also like to better support students by giving them feedback at scale about where they stand and perhaps how they compare to others in the class.
+
+You offer to build a prototype of a dashboard using her clicker data: this is a dashboard for the instructor which offers an overview of the class characteristics, engagement, and performance; and it is a dashboard for students which offers a specific student an overview of their engagement and performance (and how it compares to others).
+
+**Data**
+
+The **experience dataset** contains one record per student who completed the CS course between 2016-2018. There are two sources to this dataset: Faculty Center and a Skills Survey (administered via the Blackboard LMS) where students self reported their skill level for various skills the first week of class. This data has been de-identified.  Name, netid, emplid, major have all been removed and replaced with a unique numeric identifier. Note that not all students completed the skills survey, they will have null values for the survey result fields.
+
+|Attribute Name|Data Type|Definition|
+|--------------|-------------|----------------------------------------------|
+|student_key|numeric Unique key|Assigned as part of de-identification process.  Uniquely identifies student records for this data set only.|
+|year|numeric|Four digit year student was enrolled in BI Class.|
+|prog|character Values (GRAD, UGRAD)|Indicates whether the student was a graduate or undergraduate student when they were enrolled in BI course.|
+|database_score|numeric (0-5)|Self reported experience level with database technology prior to taking course. 0= no experience, 5= expertise|
+|sql_score|	numeric (0-5)|Self reported experience level with SQL prior to taking course. 0= no experience, 5=expertise|
+|programing_score|numeric (0-5)|Self reported experience level with Any Programing language prior to taking course. 0=no experience, 5=expertise|
+|stored_proc_score|	numeric (0-5)|Self reported experience level with stored procedure languages prior to taking course. 0=no experience, 5=expertise|
+|etl_score|	numeric (0-5)|Self reported experience level with Extract Transform Load (ETL) development prior to taking course. 0=no experience, 5=expertise|
+|data_vis_score|numeric (0-5)|Self reported experience level using data visualization tools prior to taking course. 0=no experience, 5=expertise|
+|requirement_gather_score|numeric (0-5)|Self reported experience level gathering customer requirements prior to taking course. 0=no experience, 5=expertise|
+|skill_survey_score|numeric|Sum of the self reported skill level scores.|
+
+The **quiz dataset** contains one record per student per class session held where iClickers were used. Sources used in the creation of this data set include: iClicker session xml files, Blackboard gradebook (for quiz scores), and the Blackboard class schedule (used to map iClicker session to related quiz scores). Note that in some cases there are multiple iClicker sessions / lectures associated with a single quiz. This dataset may be joined to the experience dataset by the student_key field. 
+
+|Attribute Name|Data Type|Definition|
+|--------------|-------------|----------------------------------------------|
+|Acad_date_key|numeric|Date key in the form of YYYYMMDD indicating the date the class session was held.|
+|student_key|numeric|Unique identifier for students who took BI class 2016-2018.  This key is the primary key for the experience_data file.|
+|year|numeric|Four digit year class session was held.|
+|session_number|numeric|Identifies the session number for a particular semester.  Session number is assigned by iClicker.|
+|quiz_number|numeric|There are 10 quizzes throughout the BI course.  This attribute indicates which quiz is associated with the iClicker session(s).|
+|attended|numeric (0,1)|Binary indicating whether the student attended that particular class session / lecture. 0=no, 1=yes.|
+|total_possible_clicker|numeric|The total number of iClicker questions asked that session.|
+|total_completed_clicker|numeric|The number of iClicker questions answered by student that session.|
+|completed_q_clicker|numeric|The number of completed Quiz iClicker questions|
+|correct_q_clicker|numeric|How many correct Quiz answers by student that session.|
+|completed_t_clicker|number|How many Temperature questions answered by student that session. Temperature questions are 0-5, 0= bad, 5=great. There is no correct answer to Temperature questions, they are used to guage how students are feeling about a particular subject, assignment, etc.|
+|avg_t_clicker|number|The average temperature answer by student for that session.  An average of 1 or 2 would be generally negative, while 4 or 5 would be generally positive responses.|
+|quiz_score|numeric|Quiz score out of 20 points possible.|
+
+```{r warning=FALSE, message=FALSE, echo=FALSE}
+library(tidyverse)
+
+# Below you are loading 2 new packages:shiny + shinydashboard.
+# Install them once, then comment out the install command.
+
+# install.packages("shiny")
+library(shiny)
+
+# install.packages("shinydashboard")
+library(shinydashboard)
+
+# This should load the datasets: 
+# experience (123 by 11) and quiz (2423 by 13)
+load("info4100.proj.dashboard.rda")
+```
+
+# Part 1: Planning / Sketching
+
+Go through the planning / sketching process described in the reading about dashboards. While some dashboards are certainly better than others, there is not one correct solution here. However, spending enough time to make a concrete plan is essential for the success of your project. Everything you do to make the dashboards will be easier if you have a clear plan, especially because you will be splitting up the work and everyone needs to know what they should work on.
+
+**Question 1:** You will make a student dashboard and a teacher dashboard. Carefully consider the implications of this for design and content. To plan, answer the following prompts once for the student dashboard and then for the teacher dashboard. The more concrete you are here the easier it will be later. Focus on the concrete ideas that you will implement in the next steps. You can iterate on this step and modify your responses as your ideas for the dashboard become clearer. You should explore the dataset in R for 5-10 minutes to get a good sense of what the dataset has to offer.
+
+*Planning for the student dashboard*
+
+* For whom? Who will use it and what is their background?
+    + A more involved student, tuned into the class 
+    + Undergrad, college students 
+    
+* Why? What is the goal? What questions to answer?
+    + Check their own progress and identify weaknesses, what aspects of the class they're struggling with
+    + How are students doing individually and compared to their peers
+
+* What? What data to show and what is its structure?
+    + Student progress (individual) based on scores (clicker, attendance, and quiz scores)
+    + [add your answer here]
+        
+* How? How will visualizations support the goal?
+    + Visualizations will help identify what aspect of the class the student is struggling with (clicker vs quiz)
+    + [add your answer here]
+    
+*Planning for the teacher dashboard*
+
+* For whom? Who will use it and what is their background?
+    + Professors and TAs
+    + [add your answer here]
+    
+* Why? What is the goal? What questions to answer?
+    + See how their students are doing and see what students are doing well in or not doing
+    + [add your answer here]
+
+* What? What data to show and what is its structure?
+    + Student progress overall based on scores (clicker, attendance, and quiz scores)
+    + How students are feeling temperature abt the course so there's a metric of student comfort with the material
+        
+* How? How will visualizations support the goal?
+    + Visualizations will help guage how the class is doing overall and how much comfort they feel with the material
+    + [add your answer here]
+
+**Question 2:** Based on your plan above, make a sketch of what the dashboard would look like. See this week's readings for examples. Be detailed about what kinds of data points and visualizations you want to see in different parts of the page. Consider the user experience and how you should position more general information compared to more specific information, and where you may need some additional explanation to help the viewer understand a graphic, for example. In your sketch, it is useful to give labels to different objects, because in the steps below you can split up work between team members and the labels will help you connect the UI with the data objects. Show your sketches in section to get feedback from the teaching team.
+
+# Part 2: Dashboard Wire-frame Implementation
+
+This is where you generate the dashboard layout. You are given a very basic wire frame example for the dashboard below. For more information on how R Shiny Dashboards work, look at https://rstudio.github.io/shinydashboard/get_started.html and https://rstudio.github.io/shinydashboard/structure.html. You can add different types of content into a `fuidRow()`. In the starter code, there are 2 rows of content: the first has two little info boxes; the second has two larger viz boxes. You can add more rows and change what is in them as you wish. Follow the naming convention, e.g. `inst.info1` is the first info box for instructors.
+
+Your team can split up the tasks. Some work on creating the UI (this part), while others work on pre-processing the data and creating the statistics and visualizations that will populate the UI (next part).
+
+**Question 3:** Create the layout for the dashboard tabs. You can have as many "tabs" as you like. Each tab is the content displayed when the user clicks on one of the menu items (so it is the page content). Here you are just specifying the wire frame i.e. **what goes where on the pages**, not what goes into it.
+
+```{r}
+#######################################
+####### BEGIN INPUT: Question 3 #######
+#######################################
+
+# Example of a tab (i.e. page)
+instructor_dash = tabItem(
+    tabName = "instructor",
+    h2("Instructor Dashboard"),
+    
+    # Dynamic infoBoxes
+    fluidRow(
+      infoBoxOutput("inst.info1"),
+      infoBoxOutput("inst.info2"),
+      infoBoxOutput("inst.info3")
+    ),
+    fluidRow(
+      box(
+            title = "Controls",
+            sliderInput("year", "Choose a Year:", 2016, 2018, 1),
+            #sliderInput("session", "Choose a Session:", 1, 27, 1),
+            plotOutput("inst.controller",height = 50)
+    ),
+    # Any visualization
+    fluidRow(
+        box(
+            title = "Histogram of Average Attendance",
+            plotOutput("inst.plot1", height = 250)
+        ),
+        box(
+           title = "Histogram of Quiz Score",
+            plotOutput("inst.plot2", height = 250)
+        ),
+       box(
+            title = "Histogram of Average Temperature",
+            plotOutput("inst.plot3", height = 250)
+        ),
+           #Additional Visualizations (Scatterplots)
+    fluidRow(
+       box(
+            title = "Scatterplot Attendance vs Quiz Scores",
+            plotOutput("inst.plot4", height = 400)
+        ),
+       box(
+            title = "Clickers vs Quiz Scores",
+            plotOutput("inst.plot5", height = 400)
+        )
+    )
+       )
+  )
+)
+
+
+# Another tab
+student_dash = tabItem(
+  tabName = "student",
+  h2("Student Dashboard"),
+    
+    # Dynamic infoBoxes
+    fluidRow(
+      infoBoxOutput("stud.info1"),
+      infoBoxOutput("stud.info2"),
+      infoBoxOutput("stud.info3"),
+    ),
+    
+    # Semesterlong visualizations
+    fluidRow(
+        box(
+            title = "Semesterlong Attendance",
+            plotOutput("stud.plot1", height = 250)
+        ),
+        box(
+           title = "Semesterlong Quiz Scores",
+            plotOutput("stud.plot2", height = 250)
+        ),
+        box(
+            title = "Semesterlong Clicker Scores",
+            plotOutput("stud.plot3", height = 250)
+        )
+       ),
+
+  #slider
+  fluidRow(
+      box(
+            title = "Controls",
+            sliderInput("session", "Choose a Session:", 1, 27, 1),
+            plotOutput("stud.controller",height = 50)
+    ),
+  #slider based visualizations
+    fluidRow(
+        box(
+            title = "Session Attendance",
+            plotOutput("stud.plot4", height = 250)
+        ),
+        box(
+           title = "Session Quiz Score",
+            plotOutput("stud.plot5", height = 250)
+        ),
+      box(
+         title = "Session Clicker Score",
+         plotOutput("stud.plot6", height = 250)
+      ),
+  ))
+)
+
+#######################################
+#######################################
+```
+
+# Part 3: Data Pre-processing
+
+Get the data ready for use in the dashboard. Before the next stage, you want to have the data ready in the right format for simple computations and plotting. To do this effectively, you need to know by now what you want to display in each dashboard. However, this is also an iterative process. Once you have completed a first iteration of the design, you can come back to this step and add further pre-processing for more visualizations you like to add. This step is also an opportunity to better understand the structure of the datasets.
+
+The instructor dashboard should show information for all students. The student dashboard is typically focused on an individual student. You can either pick a student (at random or intentionally) and use them as the "reference student" for the student dashboard. Or, a bit more ambitious but also more rewarding to try out, you can create an interactive dashboard in which you select the student and then the dashboard updates to show the information for that student. I would recommend you start with the simpler version and get that to work before you try to make it dynamic.
+
+Use the space below to be ready for your information visualizations in the dashboards. 
+
+```{r}
+#######################################
+####### BEGIN INPUT             #######
+#######################################
+library(dplyr)
+
+quiz$ACAD_DATE_KEY <- as.character(quiz$ACAD_DATE_KEY)
+quiz$MONTH <- substring(quiz$ACAD_DATE_KEY, 5, 6)
+quiz$DAY <- substring(quiz$ACAD_DATE_KEY, 7, 8)
+quiz$ATTENDED_CHAR <- as.character(quiz$ATTENDED)
+
+quiz[is.na(quiz)] <- 0
+
+dataByStudent <- quiz %>% group_by(STUDENT_KEY) %>% mutate(
+  avrAttendance = mean(ATTENDED),
+  avrQuizScore = mean(QUIZ_SCORE),
+  sumQCorrect = sum(CORRECT_Q_CLICKER),
+  sumQComplete = sum(COMPLETED_Q_CLICKER),
+  avrQclicker = ifelse(sumQComplete>0, sumQCorrect/sumQComplete, 0)*100,
+  avrTclicker = mean(AVG_T_CLICKER),
+  avrClickerComplete = mean(TOTAL_COMPLETED_CLICKER/TOTAL_POSSIBLE_CLICKER)
+)
+
+dataBySession <- quiz %>% group_by(SESSION_NUMBER) %>% mutate(
+  avrAttendance = mean(ATTENDED),
+  avrQuizScore = mean(QUIZ_SCORE),
+  sumQCorrect = sum(CORRECT_Q_CLICKER),
+  sumQComplete = sum(COMPLETED_Q_CLICKER),
+  avrQclicker = ifelse(sumQComplete>0, sumQCorrect/sumQComplete, 0)*100,
+  avrTclicker = mean(AVG_T_CLICKER)*100,
+  avrClickerComplete = mean(TOTAL_COMPLETED_CLICKER/TOTAL_POSSIBLE_CLICKER)
+)
+
+# Get a list of the unique student IDs
+unique_students = unique(quiz$STUDENT_KEY)
+length(unique_students)
+
+# select a random student and make a dashboard for them
+# There are 123 unique students
+selected_student <- sample(1:123, 1)
+
+# Make a data frame of info for the selected student
+studentData = filter(quiz, quiz$STUDENT_KEY == selected_student)
+  
+studentData <-  studentData%>% mutate(
+  avrAttendance = mean(ATTENDED),
+  avrQuizScore = mean(QUIZ_SCORE),
+  sumQCorrect = sum(CORRECT_Q_CLICKER),
+  sumQComplete = sum(COMPLETED_Q_CLICKER),
+  avrQclicker = ifelse(sumQComplete>0, sumQCorrect/sumQComplete, 0)*100,
+  avrTclicker = mean(AVG_T_CLICKER),
+  avrClickerComplete = mean(TOTAL_COMPLETED_CLICKER/TOTAL_POSSIBLE_CLICKER)
+)
+
+merging <- subset(dataBySession, STUDENT_KEY == selected_student)
+merging <- rename(merging, Attended_drop = ATTENDED)
+merging <- rename(merging, ATTENDED = avrAttendance)
+
+merging <- rename(merging, quizscore_drop = QUIZ_SCORE)
+merging <- rename(merging, QUIZ_SCORE = avrQuizScore)
+
+
+merging <- merging[c("STUDENT_KEY","SESSION_NUMBER", "ATTENDED", "QUIZ_SCORE", "avrQclicker")]
+merging$level = "Class"
+
+studentData$level = "Individual"
+
+merged <- studentData[c("STUDENT_KEY","SESSION_NUMBER", "ATTENDED", "QUIZ_SCORE", "avrQclicker")]
+merged$level = "Individual"
+
+comp <- rbind(merged, merging)
+#######################################
+#######################################
+```
+
+# Part 4: Prepare All Data Visualizations
+
+This is where you create the content for the wire frames you created above. Again, you can refer to the examples and documentation in https://rstudio.github.io/shinydashboard/get_started.html and https://rstudio.github.io/shinydashboard/structure.html for guidance. You can also find many examples online just by searching with Google.
+
+**Question 4:** For each of the pieces of content you planned for in the wire frames above, generate the relevant content. You need to assign them all to the `output` variable by referencing the name of the wire frame element you chose above like this `output$name.of.element`. 
+
+```{r}
+server = function(input, output) {
+    
+#######################################
+####### BEGIN INPUT: Question 4 #######
+#######################################
+  output$inst.info1 = renderInfoBox({
+        infoBox("Historic Attendance",
+                paste0(round(100 * mean(quiz$ATTENDED)), "%"), 
+                icon = icon("list"), color = "yellow")
+    })
+    
+    output$inst.info2 = renderInfoBox({
+        infoBox("Historic Temperature",
+                paste0(round(mean(quiz$COMPLETED_T_CLICKER), digits=2), "/5"), 
+                icon = icon("list"), color = "yellow")
+    })
+    
+    output$inst.info3 = renderInfoBox({
+        infoBox("Historic Quiz Average",
+                paste0(round(100 * mean(quiz$QUIZ_SCORE / 20)), "%"),
+                icon = icon("list"), color = "yellow")
+    })
+    
+    #this plot currently does not work because trying to get the slider to work
+    output$inst.plot1 = renderPlot({
+      attd <- subset(dataByStudent, YEAR == input$year)
+        ggplot(attd, aes(x = avrAttendance)) + 
+          geom_density(fill="gray") + # makes the density line and gray fill
+          labs(x = "Attendance", y = "Density") + # change axis labels
+          theme_classic() # to use white background
+    })
+    
+    output$inst.plot3 = renderPlot({
+      tempd <- subset(dataByStudent, YEAR == input$year)
+        ggplot(tempd, aes(x = avrTclicker)) + 
+          geom_density(fill="gray") + # makes the density line and gray fill
+          labs(x = "Temperature", y = "Density") + # change axis labels
+          theme_classic() # to use white background
+    })
+    
+    output$inst.plot2 = renderPlot({
+      quizd <- subset(dataByStudent, YEAR == input$year)
+        ggplot(quizd, aes(x = QUIZ_SCORE)) + 
+          geom_density(fill="gray") + # makes the density line and gray fill
+          labs(x = "Quiz Score", y = "Density") + # change axis labels
+          theme_classic() # to use white background
+    })
+    
+    #Additional Visualization of Scatterplots
+    output$inst.plot4 = renderPlot({
+        ggplot(quiz,aes(x=ATTENDED_CHAR,y=QUIZ_SCORE)) +
+        geom_jitter(width = 0.1, height = 0.1)+ 
+          labs(x = "Attendance", y = "Quiz Scores") + # change axis labels
+          theme_classic()
+    })
+    output$inst.plot5 = renderPlot({
+        ggplot(quiz,aes(x=CORRECT_Q_CLICKER/COMPLETED_Q_CLICKER,y=QUIZ_SCORE)) + geom_point()+labs(x = "Clickers Correct", y = "Quiz Scores")
+
+    })
+
+    ## student plots 
+    
+    #info boxes
+     output$stud.info1 = renderInfoBox({
+        infoBox("Historic Attendance",
+                paste0(round(100 * mean(studentData$avrAttendance)), "%"), 
+                icon = icon("list"), color = "yellow")
+    })
+    
+    output$stud.info2 = renderInfoBox({
+        infoBox("Historic Temperature",
+                paste0(round(mean(studentData$avrTclicker),digits=2),"/5"), 
+                icon = icon("list"), color = "yellow")
+    })
+    
+    output$stud.info3 = renderInfoBox({
+        infoBox("Historic Quiz Average",
+                paste0(round(100 * mean(studentData$avrQuizScore / 20)), "%"), 
+                icon = icon("list"), color = "yellow")
+    })
+    
+    
+    output$stud.plot1 = renderPlot({
+        ggplot(studentData, aes(x = ATTENDED)) + 
+          geom_density(fill="gray") + # makes the density line and gray fill
+          labs(x = "Attendance", y = "Density") + # change axis labels
+          theme_classic() # to use white background
+    })
+    
+    output$stud.plot2 = renderPlot({
+        ggplot(studentData, aes(x = QUIZ_SCORE)) + 
+          geom_density(fill="gray") + # makes the density line and gray fill
+          labs(x = "Quiz Scores", y = "Density") + # change axis labels
+          theme_classic() # to use white background
+  
+   })
+    
+  output$stud.plot3 = renderPlot({
+        ggplot(studentData, aes(x = CORRECT_Q_CLICKER)) + 
+          geom_density(fill="gray") + # makes the density line and gray fill
+          labs(x = "Correct Clicker Questions", y = "Density") + # change axis labels
+          theme_classic() # to use white background
+
+   })
+
+  
+    output$stud.plot4 = renderPlot({
+      attds <- subset(comp, SESSION_NUMBER == input$session)
+        ggplot(attds, aes(level, ATTENDED)) +
+          geom_col() + 
+          labs(y = "Attended (0 = no, 1 = yes)") + # change axis labels
+          theme_classic() # to use white background
+    })
+    
+    output$stud.plot5 = renderPlot({
+      quizds <- subset(comp, SESSION_NUMBER == input$session)
+        ggplot(quizds, aes(level, QUIZ_SCORE)) +
+          geom_col() + 
+          labs(y = "Quiz Score (out of 20)") + # change axis labels
+          theme_classic() # to use white background
+  
+   })
+    
+    output$stud.plot6 = renderPlot({
+      clickerds <- subset(comp, SESSION_NUMBER == input$session)
+          ggplot(clickerds, aes(level, avrQclicker)) +
+          geom_col() + 
+          labs(y = "Clicker Score (as % correct)") + # change axis labels
+          theme_classic() # to use white background
+   })
+  
+#######################################
+#######################################
+    
+}
+```
+
+# Part 5: Produce Dashboard and Reflect
+
+You should be able to simply run the code below **as is** to see your dashboard.
+
+**Note:** Unfortunately, you cannot knit this part into a pdf. So I added `eval=FALSE` to let the knitting run smoothly and you can submit your PDF.
+
+```{r eval=FALSE}
+#######################################
+### This code creates the dashboard ###
+#######################################
+
+# Here we set up the Header of the dashboard
+dhead = dashboardHeader(title = "Clicker Dashboard")
+
+# Here set up the sidebar which has links to two pages
+dside = dashboardSidebar(
+  sidebarMenu(
+    menuItem("Instructor View", tabName = "instructor", icon = icon("dashboard")),
+    menuItem("Student View", tabName = "student", icon = icon("th"))
+  )
+)
+
+# Here we set up the body of the dashboard
+dbody = dashboardBody(
+    tabItems(
+      student_dash,
+      instructor_dash
+    )
+)
+
+# Combining header, sidebar, and body
+ui = dashboardPage(dhead, dside, dbody)
+
+# Generating a local instance of your dashboard
+shinyApp(ui, server)
+```
+
+**Question 5:** Add screenshots of your group's dahsboards below using this syntax or simply add them to the Word document after knitting:
+
+![Dashboard Screenshot](example_dash.png)
+
+**Question 6:** Evaluate your group dashboard from the perspective of the instructor (teacher dashboard) and from the perspective of the student (student dashboard). What do you like about it, what would you change or add to it if you had more time?
+
+*Reflection for the student dashboard*
+
+* What do you like about it?
+    + I appreciate that I can see my overall progress for the semester as a whole but also be able to see on a week by week level how my performance is. I also like the "at a glance" section at the top because it allows me to quickly gain information about my overall progress in a simple form, such as my overall temperature in the class so I can have an idea of how comfortable I feel about the semester's material as awhole.
+
+* What would you change or add to it if you had more time?
+    + I would add a way to see what weeks were my best/worst at a glance, so I could know what sessions' materials I needed to review. By seeing weeks where I struggled most with the quiz or had the lowest temperature rating, I would be able to rapidly identify where the gaps in my knowledge were instead of looking at a week by week basis.
+
+* What was the biggest challenge you faced? How did you address it?
+    + The biggest challenge was deciding what the most valuable information to a student might be, so eventually we decided it would be semesterlong information and then session by session information where they could then compare their progress for a certain session to others in the class. While comparing to other students might not be helpful for the semester averages, we decided it would be helpful to see for each session how the student was doing in comparison to the whole with that week in particular's material.
+
+*Reflection for the teacher dashboard*
+
+* What do you like about it?
+    + I like that I can examine progress by year. This allows 
+    them to evaluate where disparities in learning typically happen, 
+    and compare different semesters with little effort. I like the ease of use it provides to instructors.
+
+* What would you change or add to it if you had more time?
+    + If we had more time, we would've added a feature to view student progress by date or month, in addition to year in order to get a more granular view of student progress.
+
+* What was the biggest challenge you faced? How did you address it?
+    + The largest challenge we faced was making the sliders functional/connecting the movement of the slider to a change in data visualization. We addressed this by consulting the links given in the project, as well as vocal collaboration. Making sure everyone had a good understanding of the exact problem we were trying to troubleshoot ensured space for different perspectives to enter and help. This allows us as the instructor to have a more customizable view of what data we're looking at so we can get better insight into different time periods.
+
+# Submit Project
+
+Please **Knit a Docx report** that shows both the R code and R output and upload it on the EdX platform. Alternatively, you can Knit it as a "doc", open it in Word, and save that as a PDF.
+
+**Important:** Be sure that all your code is visible. If the line is too long, it gets cut off. If that happens, organize your code on several lines.
